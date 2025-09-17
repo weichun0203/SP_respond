@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>LIFF 表單預填 Demo</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", Arial; padding: 24px; }
+    form { display: grid; gap: 12px; max-width: 420px; }
+    label { display: grid; gap: 6px; }
+    input, button { padding: 10px; font-size: 16px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>快速填單（LIFF 預填）</h2>
+
+  <form id="form">
+    <label>姓名 / 顯示名稱
+      <input id="name" name="name" placeholder="自動帶入 LINE 顯示名稱"/>
+    </label>
+
+    <label>電話（需自行填寫或既有資料回填）
+      <input id="phone" name="phone" placeholder="09xxxxxxxx"/>
+    </label>
+
+    <label>LINE userId（隱藏）
+      <input id="userId" name="userId" readonly/>
+    </label>
+
+    <button type="submit">送出</button>
+  </form>
+
+  <p id="tip"></p>
+
+  <script>
+    const LIFF_ID = "在這裡填入你的_LIFF_ID"; // ← 先硬寫，最簡單
+
+    async function main() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          // 在外部瀏覽器會導回 LINE 登入；在 LINE App 內會直接登入
+          liff.login();
+          return; // 等重導
+        }
+
+        const isInLine = liff.isInClient();
+        document.getElementById('tip').textContent = isInLine
+          ? '目前在 LINE App 內，可使用 sendMessages() 等能力。'
+          : '目前在外部瀏覽器，sendMessages() 會受限。';
+
+        // 取得使用者資訊（需 scope: profile）
+        const prof = await liff.getProfile();
+        document.getElementById('name').value   = prof?.displayName || "";
+        document.getElementById('userId').value = prof?.userId || "";
+
+        // 表單送出（示範：先 console；之後可打到你的 API/Google Sheet）
+        document.getElementById('form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const payload = {
+            name: document.getElementById('name').value,
+            phone: document.getElementById('phone').value,
+            userId: document.getElementById('userId').value,
+          };
+          console.log('送出資料：', payload);
+
+          // 如果之後接 API，改成：
+          // await fetch('/api/submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+
+          if (isInLine) {
+            try {
+              await liff.sendMessages([{ type: 'text', text: '資料已送出 ✅' }]);
+            } catch (e) {
+              console.warn('sendMessages 失敗：', e);
+            }
+            liff.closeWindow?.();
+          } else {
+            alert('資料已送出（示範）。');
+          }
+        });
+      } catch (err) {
+        console.error('LIFF 初始化失敗', err);
+        alert('LIFF 初始化失敗，請檢查 LIFF ID 與後台設定。');
+      }
+    }
+    main();
+  </script>
+</body>
+</html>
